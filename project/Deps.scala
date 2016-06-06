@@ -29,6 +29,7 @@ trait Deps {
   val async = "org.scala-lang.modules" %% "scala-async" % "0.9.5"
 
   val scalaz = "org.scalaz" %% "scalaz-core" % scalaZVersion
+  val scalazConcurrent = "org.scalaz" %% "scalaz-concurrent" % scalaZVersion
 
   val libs = Seq(
 

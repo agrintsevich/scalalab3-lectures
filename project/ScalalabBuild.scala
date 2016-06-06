@@ -25,6 +25,21 @@ object ScalalabBuild extends Build with SbtUtils {
     Seq(libraryDependencies ++= Seq(scalaz))
   )
 
+  lazy val macro_impl = project("macroimpl", "macroimpl").settings(
+    Seq(libraryDependencies ++= Seq(
+      "org.scalamacros" % "paradise_2.11.0" % "2.1.0-M5",
+      scalazConcurrent
+    ))
+  ).settings(
+    addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0-M5" cross CrossVersion.full)
+  )
+
+  lazy val lectures_macro = project("macroworld", "lectures/macroworld")
+    .settings(
+      Seq(libraryDependencies ++= Seq(scalazConcurrent)),
+      addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0-M5" cross CrossVersion.full)
+    ).dependsOn(macro_impl)
+
   lazy val main = project("scalalab3", ".").settings(
     Seq(
       name := "scalalab3",
@@ -35,7 +50,8 @@ object ScalalabBuild extends Build with SbtUtils {
     lectures_shapeless,
     lectures_fs,
     lectures_actors,
-    lectures_scalaz
+    lectures_scalaz,
+    lectures_macro
   )
 
 
