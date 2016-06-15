@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>macro</title>
+    <meta charset="utf-8">
+    <style>
+      @import url(https://fonts.googleapis.com/css?family=Droid+Serif);
+      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+      body {
+        font-family: 'Droid Serif';
+      }
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz';
+        font-weight: 400;
+        margin-bottom: 0;
+      }
+      .remark-slide-content h1 { font-size: 3em; }
+      .remark-slide-content h2 { font-size: 2em; }
+      .remark-slide-content h3 { font-size: 1.6em; }
+      .footnote {
+        position: absolute;
+        bottom: 3em;
+      }
+      li p { line-height: 1.25em; }
+      .red { color: #fa0000; }
+      .large { font-size: 2em; }
+      a, a > code {
+        color: rgb(249, 38, 114);
+        text-decoration: none;
+      }
+      code {
+        background: #e7e8e2;
+        border-radius: 5px;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+      .remark-code-line-highlighted     { background-color: #373832; }
+      .pull-left {
+        float: left;
+        width: 47%;
+      }
+      .pull-right {
+        float: right;
+        width: 47%;
+      }
+      .pull-right ~ p {
+        clear: both;
+      }
+      #slideshow .slide .content code {
+        font-size: 0.8em;
+      }
+      #slideshow .slide .content pre code {
+        font-size: 0.9em;
+        padding: 15px;
+      }
+      .inverse {
+        background: #272822;
+        color: #777872;
+        text-shadow: 0 0 20px #333;
+      }
+      .inverse h1, .inverse h2 {
+        color: #f3f3f3;
+        line-height: 0.8em;
+      }
+
+      /* Slide-specific styling */
+      #slide-inverse .footnote {
+        bottom: 12px;
+        left: 20px;
+      }
+      #slide-how .slides {
+        font-size: 0.9em;
+        position: absolute;
+        top:  151px;
+        right: 140px;
+      }
+      #slide-how .slides h3 {
+        margin-top: 0.2em;
+      }
+      #slide-how .slides .first, #slide-how .slides .second {
+        padding: 1px 20px;
+        height: 90px;
+        width: 120px;
+        -moz-box-shadow: 0 0 10px #777;
+        -webkit-box-shadow: 0 0 10px #777;
+        box-shadow: 0 0 10px #777;
+      }
+      #slide-how .slides .first {
+        background: #fff;
+        position: absolute;
+        top: 20%;
+        left: 20%;
+        z-index: 1;
+      }
+      #slide-how .slides .second {
+        position: relative;
+        background: #fff;
+        z-index: 0;
+      }
+
+      /* Two-column layout */
+      .left-column {
+        color: #777;
+        width: 20%;
+        height: 92%;
+        float: left;
+      }
+        .left-column h2:last-of-type, .left-column h3:last-child {
+          color: #000;
+        }
+      .right-column {
+        width: 75%;
+        float: right;
+        padding-top: 1em;
+      }
+
+    </style>
+</head>
+<body>
+<textarea id="source">
+
+class: center, middle
+
+# scala macros
+
+---
+
+
+.center[
+# scalac
+] 
+
+```scala
+scalac -help
+```
+
+
+.red[`-X` Print a synopsis of advanced options]
+
+.red[`-Xshow-phases` Print a synopsis of compiler phases.]
+
+.red[`-Xprint:<phases>` Print out program after `<phases>`]
+
+---
+
+```scala
+phase name  id  description
+    ----------  --  -----------
+        parser   1  parse source into ASTs, perform simple desugaring
+         namer   2  resolve names, attach symbols to named trees
+packageobjects   3  load package objects
+         typer   4  the meat and potatoes: type the trees
+        patmat   5  translate match expressions
+superaccessors   6  add super accessors in traits and nested classes
+    extmethods   7  add extension methods for inline classes
+       pickler   8  serialize symbol tables
+     refchecks   9  reference/override checking, translate nested objects
+       uncurry  10  uncurry, translate function values to anonymous classes
+     tailcalls  11  replace tail calls by jumps
+    specialize  12  @specialized-driven class and method specialization
+ explicitouter  13  this refs to outer pointers
+       erasure  14  erase types, add interfaces for traits
+   posterasure  15  clean up erased inline classes
+      lazyvals  16  allocate bitmaps, translate lazy vals into lazified defs
+    lambdalift  17  move nested functions to top level
+  constructors  18  move field definitions into constructors
+       flatten  19  eliminate inner classes
+         mixin  20  mixin composition
+       cleanup  21  platform-specific cleanups, generate reflective calls
+    delambdafy  22  remove lambdas
+         icode  23  generate portable intermediate code
+           jvm  24  generate JVM bytecode
+      terminal  25  the last phase during a compilation run
+```
+
+---
+
+```scala
+// Main.scala
+object Main {
+  List(1,2,3).filter(_ > 1)
+}
+```
+
+.red[`scalac -Xprint:22 Main.scala`]
+
+
+```scala
+[[syntax trees at end of                delambdafy]] // Main.scala
+package <empty> {
+  object Main extends Object {
+    def <init>(): Main.type = {
+      Main.super.<init>();
+      immutable.this.List.apply(scala.this.Predef.wrapIntArray(Array[Int]{1, 2, 3})).filter({
+        (new <$anon: Function1>(): Function1)
+      });
+      ()
+    }
+  };
+  @SerialVersionUID(value = 0) final <synthetic> class anonfun$1 extends 
+  scala.runtime.AbstractFunction1$mcZI$sp with Serializable {
+    final def apply(x$1: Int): Boolean = anonfun$1.this.apply$mcZI$sp(x$1);
+    <specialized> def apply$mcZI$sp(x$1: Int): Boolean = x$1.>(1);
+    final <bridge> <artifact> def apply(v1: Object): Object = 
+      scala.Boolean.box(anonfun$1.this.apply(scala.Int.unbox(v1)));
+    def <init>(): <$anon: Function1> = {
+      anonfun$1.super.<init>();
+      ()
+    }
+  }
+}
+
+```
+
+---
+
+# Expressions 
+
+```scala
+val a = if (a > 1) { } else { }
+
+val x = f()
+
+```
+
+# Statements
+
+```scala
+trait A extends Any {}
+
+object X 
+```
+
+---
+
+# AST 
+
+.center[`a + b`] 
+
+.center[![image](images/m1.png)]
+
+---
+
+# AST 
+
+.center[`a + b`] 
+
+```scala
+Apply(Select(Literal(Constant(1)), TermName("$plus")), List(Literal(Constant(1))))
+
+Apply(
+  Select(
+    Literal(Constant(1)), TermName("$plus")
+  ), 
+  List(Literal(Constant(1)))
+)
+
+
+```
+
+---
+
+# Runtime, compiletime
+
+```scala
+
+import scala.language.experimental.macros
+import scala.reflect.macros.blackbox.Context // ~ expression
+
+// or 
+
+import scala.language.experimental.macros
+import scala.reflect.macros.whitebox.Context // ~ statement
+
+
+```
+
+---
+
+# Simple macro
+
+```scala
+
+def simpleMacro(x: Int): Int = macro simpleMacroImpl
+
+
+```
+
+```scala
+def simpleMacroImpl(c: Context)(x: c.Expr[Int]): c.Expr[Int] = {
+  
+  import c.universe._ 
+
+  c.Expr[Int](q"$x")
+
+}
+```
+
+### define macro as scala method
+
+### macro - keyword
+
+### c - methods for internal compiler api
+
+### q - quasiquote, scala code instead of raw AST
+
+### c.Expr - like `asInstanceOf` 
+
+---
+
+# How to debug? 
+
+```scala
+def simpleMacroImpl(x: c.Expr[Int]) = 
+```
+
+1. `println` -> `Expr[Nothing](10)`
+
+2. `show` -> `Expr[Nothing](10)`
+
+3. `showRaw` -> `Expr(Literal(Constant(10)))`
+
+4. `-Ymacro-debug-lite` 
+
+---
+
+### examples: stop compilation
+
+```scala
+c.error(c.enclosingPosition, "Error")
+```
+
+---
+
+### examples: get name of method arguments
+
+```scala
+val owner = c.internal.enclosingOwner
+
+owner.asMethod.paramLists.flatten.head.asTerm.name.toString
+```
+
+---
+
+# examples: get type name
+
+```scala
+c.symbolOf[T]
+``` 
+
+---
+
+# examples: get constructor arguments
+
+```scala
+c.weakTypeOf[T]
+  .decl(termNames.CONSTRUCTOR)
+  .alternatives
+  .collect {
+    case m: MethodSymbol => m.paramLists.flatten
+  } // => List[List(...)]
+```
+
+---
+
+# Macro? 
+
+1. code generation
+
+2. code optimization
+
+3. dsl
+
+---
+
+### code generation
+
+```scala
+case class Foo(id: Int, name: String, args: Option[String])
+
+// toString => Foo(1,name,Some(args))
+
+```
+
+---
+
+### Macro Annotation!
+
+
+```scala
+@ToString
+case class Foo(id: Int, name: String, args: Option[String])
+```
+
+1. add annotation
+
+2. get class name
+
+3. get arguments names
+
+4. add `toString` method
+
+5. return new class
+
+
+---
+
+### add annotation
+
+```scala
+import scala.annotation.{StaticAnnotation, compileTimeOnly}
+
+@compileTimeOnly("enable macro paradise to expand macro annotations")
+class ToString extends StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro ToStringImpl.impl
+}
+```
+
+---
+
+### get class name (debug time)
+
+```scala
+def impl(annottees: c.Expr[Any]*): c.Expr[Any] = {
+  
+  println(showRaw(annottees))
+
+
+```
+
+```scala
+List(Expr[Nothing](case class Foo extends scala.Product with scala.Serializable {
+    <caseaccessor> <paramaccessor> val id: Int = _;
+    <caseaccessor> <paramaccessor> val name: String = _;
+    <caseaccessor> <paramaccessor> val args: Option[String] = _;
+    def <init>(id: Int, name: String, args: Option[String]) = {
+      super.<init>();
+      ()
+    }
+  }))
+```
+
+---
+
+### get class name pattern matching in `q` - 1 
+
+
+.center[![image](images/m2.png)]
+
+
+---
+
+### get class name pattern matching in `q` - 2
+
+```scala
+case q"""
+  $mods class $tpname[..$tparams] 
+    $ctorMods(...$paramss) extends { ..$earlydefns } 
+    with ..$parents { $self => ..$stats   }
+""" =>
+
+
+```
+
+---
+
+### what about objects, methods, not case classes?
+
+```scala
+if (!mods.hasFlag(Flag.CASE)) {
+  c.abort(c.enclosingPosition, "case class only")
+}
+```
+
+---
+
+### get arguments names
+
+```scala
+paramss.flatten.map {
+  // mods: Modifiers, name: TermName, tpt: Tree, rhs: Tree
+  case ValDef(modifiers, name, tpt, rhs) =>
+
+```
+
+---
+
+### generate method body
+
+```scala
+paramss.flatten.map {
+ case ValDef(modifiers, name, tpt, rhs) =>
+   val n = s" $name = "
+    q"""
+       $n + $name + "\n"
+    """
+}.reduce((a, b) => q"""  $a + $b  """)
+```
+
+### ouput:
+
+```
+id = 1 
+name = name
+args = Some(args) 
+```
+
+---
+
+### get class name
+
+```scala
+val klassName = tpname.toTermName.toString
+```
+
+---
+
+### generate method
+
+```scala
+val toStringBody = q"""
+  override def toString = $klassName + "[" + $parameters + "]"
+"""
+```
+
+---
+
+### new class body 
+
+
+```scala
+newClass = annottees.head.tree match {
+  case q"$mods class { $self => ..$stats }" =>
+
+    q"""$mods class { 
+            ..$stats
+            ..$toStringBody
+          }
+        """
+```
+
+---
+
+### return :)
+
+```scala
+c.Expr[Any](newClass)
+```
+
+#### check
+
+```
+println(Foo(1, "some name", None))
+   
+    Foo[ id = 1
+     name = some name
+     args = None
+    ]
+
+```
+
+---
+
+```scala
+
+case q"$mods class $tpname[..$tparams] $ctorMods(...$paramss) 
+  extends { ..$earlydefns } with ..$parents { $self => ..$stats }" =>
+
+  if (!mods.hasFlag(Flag.CASE)) {
+    c.abort(c.enclosingPosition, "case class only")
+  }
+ 
+  val parameters = paramss.flatten.map {
+    case ValDef(modifiers, name, tpt, rhs) =>
+      val n = s" $name = "
+      q"""
+         $n + $name + "\n"
+      """
+  }.reduce((a, b) => q"""  $a + $b  """)
+  
+  val klassName = tpname.toTermName.toString
+
+  val toStringBody = q"""
+    override def toString = $klassName + "[" + $parameters + "]"
+  """
+
+  q"""$mods class $tpname[..$tparams] $ctorMods(...$paramss) 
+    extends
+      { ..$earlydefns } with ..$parents { $self =>
+      ..$stats
+      ..$toStringBody
+    }
+  """
+
+
+```
+
+
+---
+
+# Opmimization: OMP
+
+
+### run collection methods parallel
+
+1. get collection
+
+2. get method name
+
+3. move method in `Task`
+
+4. ...
+
+5. profit! 
+
+
+---
+
+### step 1 
+
+```scala
+val collection = (1 to 1000).toVector
+
+val x = omp {
+  collection.filter(x => x > 1)
+}
+```
+
+---
+
+### step 2: macro
+
+```scala
+def omp[T](comp: T): T = macro OmpImpl.impl[T]
+```
+
+```scala
+def impl[T: c.WeakTypeTag](c: Context)(comp: c.Expr[T]): c.Tree = {
+
+}
+```
+
+---
+
+### step 3: get method
+
+```scala
+comp.tree match {
+  case  q"$expr.$tname(...$exprss)" =>
+}
+```
+
+---
+
+### step 4: parallelize!
+
+```scala
+q"""
+  scalaz.concurrent.Task.gatherUnordered($expr.grouped(10)
+  .map(seq => scalaz.concurrent.Task { seq.$tname(...$exprss) }).toSeq)
+  .unsafePerformSync.flatten.to[${c.symbolOf[T]}]
+"""
+
+### output:
+
+```scala
+Task
+.gatherUnordered(z.grouped(10)
+  .map(seq =>
+    Task {
+      seq.filter(x => x > 1)
+    }).toSeq)
+  .unsafePerformSync.flatten.to[Vector]
+```
+---
+
+```scala
+
+def impl[T: c.WeakTypeTag](c: Context)(comp: c.Expr[T]): c.Tree = {
+  import c.universe._
+
+  val result = comp.tree match {
+    // z.filter(func)
+    // List(List(((x: Int) => x.>(1))))
+    case  q"$expr.$tname(...$exprss)" =>
+      q"""
+        scalaz.concurrent.Task.gatherUnordered($expr.grouped(10)
+        .map(seq => scalaz.concurrent.Task { seq.$tname(...$exprss) }).toSeq)
+        .unsafePerformSync.flatten.to[${c.symbolOf[T]}]
+      """
+
+    case _ =>
+      c.abort(c.enclosingPosition, s"cannot to optimise ${comp.tree}")
+  }
+
+  result
+}
+```
+
+---
+
+class: center, middle
+
+# Questions?
+
+
+
+
+
+
+
+
+
+
+
+
+    </textarea>
+<script src="remark-latest.min.js">
+</script>
+<script>
+      var slideshow = remark.create({
+        highlightStyle: 'tomorrow'
+      });
+    </script>
+<script src="remark-zoom.js" type="text/javascript"></script>
+</body>
+</html>
